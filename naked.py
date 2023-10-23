@@ -3,13 +3,25 @@ import json
 import datetime
 import time
 import yaml
+import logging
+import logging.config
 
 from datetime import datetime
 from configparser import ConfigParser
-print('Asteroid processing service')
+
+# Loading logging configuration
+with open('./log_worker.yaml', 'r') as stream:
+	log_config = yaml.safe_load(stream)
+
+logging.config.dictConfig(log_config)
+
+# Creating logger
+logger = logging.getLogger('root')
+
+logger.info('Asteroid processing service')
 
 # Initiating and reading config values
-print('Loading configuration from file')
+logger.info('Loading configuration from file')
 
 try:
 	config = ConfigParser()
@@ -21,22 +33,22 @@ try:
 except:
 	logger.exception('')
 
-print('DONE')
+logger.info('DONE')
 
 
 # Getting todays date
 dt = datetime.now()
 request_date = str(dt.year) + "-" + str(dt.month).zfill(2) + "-" + str(dt.day).zfill(2)  
-print("Generated today's date: " + str(request_date))
+logger.debug("Generated today's date: " + str(request_date))
 
 # Printing requested data from NASA
-print("Request url: " + str(nasa_api_url + "rest/v1/feed?start_date=" + request_date + "&end_date=" + request_date + "&api_key=" + nasa_api_key))
+logger.debug("Request url: " + str(nasa_api_url + "rest/v1/feed?start_date=" + request_date + "&end_date=" + request_date + "&api_key=" + nasa_api_key))
 r = requests.get(nasa_api_url + "rest/v1/feed?start_date=" + request_date + "&end_date=" + request_date + "&api_key=" + nasa_api_key)
 
 # Printing response data from NASA request
-print("Response status code: " + str(r.status_code))
-print("Response headers: " + str(r.headers))
-print("Response content: " + str(r.text))
+logger.debug("Response status code: " + str(r.status_code))
+logger.debug("Response headers: " + str(r.headers))
+logger.debug("Response content: " + str(r.text))
 
 # Continuing only if the response from NASA is valid
 if r.status_code == 200:
@@ -51,7 +63,7 @@ if r.status_code == 200:
 # Checks if there are asteroids in the given date and prints the count of asteroids
 	if 'element_count' in json_data:
 		ast_count = int(json_data['element_count'])
-		print("Asteroid count today: " + str(ast_count))
+		logger.debug("Asteroid count today: " + str(ast_count))
 
 # Processes the information about asteroids, if there is at least one asteroid in the response data
 		if ast_count > 0:
@@ -100,7 +112,7 @@ if r.status_code == 200:
 							tmp_ast_close_appr_dt = "1969-12-31 23:59:59"
 # If there is no specific data about close-approaching asteroids, then prints the respective statement and assigns default values to the corresponding variables
 					else:
-						print("No close approach data in message")
+						logger.info("No close approach data in message")
 						tmp_ast_close_appr_ts = 0
 						tmp_ast_close_appr_dt_utc = "1970-01-01 00:00:00"
 						tmp_ast_close_appr_dt = "1970-01-01 00:00:00"
@@ -108,10 +120,10 @@ if r.status_code == 200:
 						tmp_ast_miss_dist = -1
 
 # Prints the information about asteroid
-					print("------------------------------------------------------- >>")
-					print("Asteroid name: " + str(tmp_ast_name) + " | INFO: " + str(tmp_ast_nasa_jpl_url) + " | Diameter: " + str(tmp_ast_diam_min) + " - " + str(tmp_ast_diam_max) + " km | Hazardous: " + str(tmp_ast_hazardous))
-					print("Close approach TS: " + str(tmp_ast_close_appr_ts) + " | Date/time UTC TZ: " + str(tmp_ast_close_appr_dt_utc) + " | Local TZ: " + str(tmp_ast_close_appr_dt))
-					print("Speed: " + str(tmp_ast_speed) + " km/h" + " | MISS distance: " + str(tmp_ast_miss_dist) + " km")
+					logger.info("------------------------------------------------------- >>")
+					logger.debug("Asteroid name: " + str(tmp_ast_name) + " | INFO: " + str(tmp_ast_nasa_jpl_url) + " | Diameter: " + str(tmp_ast_diam_min) + " - " + str(tmp_ast_diam_max) + " km | Hazardous: " + str(tmp_ast_hazardous))
+					logger.debug("Close approach TS: " + str(tmp_ast_close_appr_ts) + " | Date/time UTC TZ: " + str(tmp_ast_close_appr_dt_utc) + " | Local TZ: " + str(tmp_ast_close_appr_dt))
+					logger.debug("Speed: " + str(tmp_ast_speed) + " km/h" + " | MISS distance: " + str(tmp_ast_miss_dist) + " km")
 					
 					# Adding asteroid data to the corresponding array
 					if tmp_ast_hazardous == True:
@@ -121,26 +133,26 @@ if r.status_code == 200:
 
 # Prints appropriate mesage, if there are no asteroids in the data
 		else:
-			print("No asteroids are going to hit earth today")
+			logger.info("No asteroids are going to hit earth today")
 
 # Prints the number of safe and hazardous asteroids in the data
-	print("Hazardous asteorids: " + str(len(ast_hazardous)) + " | Safe asteroids: " + str(len(ast_safe)))
+	logger.debug("Hazardous asteorids: " + str(len(ast_hazardous)) + " | Safe asteroids: " + str(len(ast_safe)))
 
 # If there is at least one hazardous asteroid in the data, sorts and prints the information about them
 	if len(ast_hazardous) > 0:
 
 		ast_hazardous.sort(key = lambda x: x[4], reverse=False)
 
-		print("Today's possible apocalypse (asteroid impact on earth) times:")
+		logger.warning("Today's possible apocalypse (asteroid impact on earth) times:")
 		for asteroid in ast_hazardous:
 			print(str(asteroid[6]) + " " + str(asteroid[0]) + " " + " | more info: " + str(asteroid[1]))
 
 		ast_hazardous.sort(key = lambda x: x[8], reverse=False)
-		print("Closest passing distance is for: " + str(ast_hazardous[0][0]) + " at: " + str(int(ast_hazardous[0][8])) + " km | more info: " + str(ast_hazardous[0][1]))
+		logger.debug("Closest passing distance is for: " + str(ast_hazardous[0][0]) + " at: " + str(int(ast_hazardous[0][8])) + " km | more info: " + str(ast_hazardous[0][1]))
 # If there is no hazardous asteroids in the data, then prints out a corresponding message
 	else:
-		print("No asteroids close passing earth today")
+		logger.info("No asteroids close passing earth today")
 
 # If the response from NASA is not valid, then prints out an appropriate statement
 else:
-	print("Unable to get response from API. Response code: " + str(r.status_code) + " | content: " + str(r.text))
+	logger.error("Unable to get response from API. Response code: " + str(r.status_code) + " | content: " + str(r.text))
